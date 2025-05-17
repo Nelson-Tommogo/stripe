@@ -42,12 +42,13 @@ router.post('/stkpush', getToken, validatePhoneNumber, validateAmount, stkPushLi
         let { phoneNumber, amount, reference } = req.body;
 
         // Additional validation
-        if (isNaN(amount) {
+        if (isNaN(amount)) {
             return res.status(400).json({ 
                 success: false,
                 error: 'Amount must be a valid number' 
             });
-        }
+        }});
+        
 
         amount = Math.round(amount); // Safaricom requires whole numbers
 

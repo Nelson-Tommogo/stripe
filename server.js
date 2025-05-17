@@ -21,11 +21,8 @@ mongoose.connect(DATABASE_URL)
   });
 
 const whitelist = [
-  'https://aloefloraproducts.com',
-  'http://aloefloraproducts.com',
   'http://localhost:3000',
   'https://localhost:3000',
-  'https://aloeflora-lg66.onrender.com'
 ];
 
 const corsOptions = {
@@ -84,7 +81,7 @@ app.use('/api/transactions', transactionRoutes);
 // Health check endpoint
 app.get('/', (req, res) => {
   res.status(200).json({ 
-    message: 'Aloe Flora Limited Server is up and running!',
+    message: 'Our Backend Server is up and running!',
     status: 'healthy',
     timestamp: new Date().toISOString()
   });
@@ -109,7 +106,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Aloe Flora Limited Server is running on port ${PORT}`);
+  console.log(`Our Backend Server is running on port ${PORT}`);
   console.log('Allowed origins:', whitelist);
 });
 
