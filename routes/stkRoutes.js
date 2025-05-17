@@ -4,7 +4,6 @@ import express from 'express';
 import axios from 'axios';
 import moment from 'moment';
 import Transaction from '../models/Transaction.js';
-// src/routes/stkRoutes.js
 import { getToken } from '../middlewares/tokenMiddleware.js';
 
 const router = express.Router();
@@ -17,7 +16,7 @@ router.get('/token', getToken, (req, res) => {
     });
 });
 
-// Route to handle STK push request
+// Route to handle STK push request via Till Number
 router.post('/stkpush', getToken, async (req, res) => {
     try {
         const token = req.token;
@@ -34,33 +33,33 @@ router.post('/stkpush', getToken, async (req, res) => {
         }
 
         const timestamp = moment().format('YYYYMMDDHHmmss');
-        const businessShortCode = process.env.M_PESA_SHORT_CODE;
+        const tillNumber = process.env.M_PESA_SHORT_CODE;
         const passKey = process.env.M_PESA_PASSKEY;
-        const password = Buffer.from(`${businessShortCode}${passKey}${timestamp}`).toString('base64');
+        const password = Buffer.from(`${tillNumber}${passKey}${timestamp}`).toString('base64');
 
         const requestBody = {
-            BusinessShortCode: businessShortCode,
+            BusinessShortCode: tillNumber,
             Password: password,
             Timestamp: timestamp,
-            TransactionType: 'CustomerPayBillOnline',
+            TransactionType: 'CustomerBuyGoodsOnline',
             Amount: amount,
             PartyA: phoneNumber,
-            PartyB: businessShortCode,
+            PartyB: tillNumber,
             PhoneNumber: phoneNumber,
             CallBackURL: process.env.CALLBACK_URL,
-            AccountReference: phoneNumber,
-            TransactionDesc: 'Payment for goods/services',
+            AccountReference: 'BuyGoods',
+            TransactionDesc: 'Payment via Till Number',
         };
 
         const response = await axios.post(
-            'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+            process.env.MPESA_API_URLS_STK_PUSH,
             requestBody,
             { headers: { Authorization: `Bearer ${token}` } }
         );
 
         if (response.data.ResponseCode === '0') {
             return res.status(200).json({
-                message: 'Payment has been Initiated, Please check your phone to proceed.',
+                message: 'Payment has been initiated. Check your phone to proceed.',
                 checkoutRequestID: response.data.CheckoutRequestID,
                 merchantRequestID: response.data.MerchantRequestID,
                 responseDescription: response.data.ResponseDescription,
@@ -72,7 +71,7 @@ router.post('/stkpush', getToken, async (req, res) => {
             });
         }
     } catch (error) {
-        console.error('Error during while sending payment request:', error.message);
+        console.error('Error during STK push:', error.message);
         if (error.response) {
             return res.status(error.response.status).json({
                 error: 'Safaricom API Error',
@@ -86,6 +85,7 @@ router.post('/stkpush', getToken, async (req, res) => {
     }
 });
 
+// Handle STK Callback from Safaricom
 router.post('/callback', async (req, res) => {
     try {
         const callbackData = req.body;
@@ -104,7 +104,6 @@ router.post('/callback', async (req, res) => {
             CallbackMetadata: metadata
         } = stkCallback;
 
-        // Base update object
         const transactionUpdate = {
             merchantRequestID,
             checkoutRequestID,
@@ -115,7 +114,6 @@ router.post('/callback', async (req, res) => {
             rawCallback: callbackData
         };
 
-        // Only add metadata fields on success
         if (resultCode === 0 && metadata) {
             const extract = (name) =>
                 metadata.Item.find((i) => i.Name === name)?.Value;
@@ -123,10 +121,9 @@ router.post('/callback', async (req, res) => {
             transactionUpdate.mpesaReceiptNumber = extract('MpesaReceiptNumber');
             transactionUpdate.amount = extract('Amount');
             transactionUpdate.phoneNumber = extract('PhoneNumber');
-            transactionUpdate.transactionDate = new Date(); // You can set this to Safaricom timestamp if needed
+            transactionUpdate.transactionDate = new Date();
         }
 
-        // Find existing or insert new
         const transaction = await Transaction.findOneAndUpdate(
             { checkoutRequestID },
             { $set: transactionUpdate },
@@ -144,9 +141,7 @@ router.post('/callback', async (req, res) => {
     }
 });
 
-
-
-
+// Query STK Push Status
 router.post('/stkquery', getToken, async (req, res) => {
     try {
         const { checkoutRequestID } = req.body;
@@ -178,7 +173,6 @@ router.post('/stkquery', getToken, async (req, res) => {
 
         const { ResultCode, ResultDesc } = response.data;
         
-        // Query for the transaction using CheckoutRequestID
         const transaction = await Transaction.findOne({ checkoutRequestID });
 
         if (!transaction) {
@@ -187,19 +181,16 @@ router.post('/stkquery', getToken, async (req, res) => {
             });
         }
 
-        // Update the transaction status based on the ResultCode
         let status = "failed";
         if (ResultCode === "0") {
-            status = "completed"; // Successful payment
+            status = "completed";
         }
 
-        // Update the transaction in the database
         transaction.status = status;
         transaction.resultCode = ResultCode;
         transaction.resultDesc = ResultDesc;
         transaction.transactionDate = moment().toDate();
 
-        // Save the updated transaction
         await transaction.save();
 
         return res.status(200).json({
@@ -215,6 +206,5 @@ router.post('/stkquery', getToken, async (req, res) => {
         });
     }
 });
-
 
 export default router;
