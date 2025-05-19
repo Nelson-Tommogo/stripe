@@ -2,8 +2,8 @@ import express from 'express';
 import axios from 'axios';
 import moment from 'moment';
 import Transaction from '../models/Transaction.js';
-import { getToken } from '../middlewares/tokenMiddleware.js';
-import { validatePhoneNumber, validateAmount } from '../middlewares/validationMiddleware.js';
+import { getToken } from './middleware/';
+import { validatePhoneNumber, validateAmount } from './middleware/validationMiddleware.js';
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
@@ -47,8 +47,7 @@ router.post('/stkpush', getToken, validatePhoneNumber, validateAmount, stkPushLi
                 success: false,
                 error: 'Amount must be a valid number' 
             });
-        }});
-        
+        }
 
         amount = Math.round(amount); // Safaricom requires whole numbers
 
